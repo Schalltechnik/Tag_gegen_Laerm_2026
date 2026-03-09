@@ -1,0 +1,390 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Stempelpass</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      min-height: 100vh;
+      font-family: Georgia, 'Times New Roman', serif;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 2rem 1rem;
+      background: linear-gradient(135deg, #0f0f1a 0%, #1a1a2e 50%, #16213e 100%);
+      transition: background 1.2s ease;
+    }
+    body.done {
+      background: linear-gradient(135deg, #052e16 0%, #14532d 40%, #166534 100%);
+    }
+
+    #title {
+      font-size: 2.5rem;
+      letter-spacing: 0.15em;
+      color: #e2e8f0;
+      text-align: center;
+      margin-bottom: 0.3rem;
+      transition: color 1s;
+    }
+    body.done #title {
+      color: #4ade80;
+      animation: glow 2s infinite;
+    }
+    #subtitle {
+      color: #9ca3af;
+      font-size: 0.85rem;
+      letter-spacing: 0.25em;
+      text-transform: uppercase;
+      text-align: center;
+      margin-bottom: 2rem;
+    }
+
+    .card {
+      background: rgba(255,255,255,0.04);
+      border: 1px solid rgba(255,255,255,0.1);
+      border-radius: 20px;
+      padding: 2.5rem 2rem;
+      max-width: 440px;
+      width: 100%;
+      backdrop-filter: blur(16px);
+      box-shadow: 0 8px 32px rgba(0,0,0,0.4);
+      transition: all 1s ease;
+    }
+    body.done .card {
+      background: rgba(20,83,45,0.45);
+      border-color: #4ade8066;
+      box-shadow: 0 0 60px #4ade8033, 0 8px 32px rgba(0,0,0,0.4);
+    }
+
+    /* Progress bar */
+    .progress-row {
+      display: flex;
+      justify-content: space-between;
+      margin-bottom: 6px;
+    }
+    .progress-label { color: #9ca3af; font-size: 0.8rem; }
+    .progress-count { color: #e2e8f0; font-size: 0.8rem; font-weight: bold; transition: color 0.5s; }
+    body.done .progress-count { color: #4ade80; }
+    .progress-track {
+      background: rgba(255,255,255,0.1);
+      border-radius: 999px;
+      height: 6px;
+      overflow: hidden;
+      margin-bottom: 1.8rem;
+    }
+    .progress-fill {
+      background: linear-gradient(90deg, #059669, #4ade80);
+      height: 100%;
+      border-radius: 999px;
+      width: 0%;
+      transition: width 0.6s ease;
+    }
+
+    /* Station cards */
+    .station {
+      background: rgba(255,255,255,0.03);
+      border: 1px solid rgba(255,255,255,0.08);
+      border-radius: 12px;
+      padding: 1rem 1.2rem;
+      margin-bottom: 1.2rem;
+      transition: all 0.5s ease;
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+    }
+    .station.stamped {
+      background: rgba(20,83,45,0.3);
+      border-color: #4ade8055;
+    }
+    .stamp-icon { flex-shrink: 0; }
+    .stamp-icon svg { display: block; }
+    .station-body { flex: 1; }
+    .station-label {
+      color: #d1d5db;
+      font-weight: bold;
+      font-size: 0.95rem;
+      letter-spacing: 0.05em;
+      margin-bottom: 0.5rem;
+      transition: color 0.4s;
+    }
+    .station.stamped .station-label { color: #4ade80; }
+    .station-code-hint { margin-left: 8px; font-size: 0.8rem; color: #6ee7b7; font-weight: normal; }
+
+    .input-row { display: flex; gap: 0.5rem; align-items: center; }
+    input[type=number] {
+      background: rgba(255,255,255,0.07);
+      border: 1px solid rgba(255,255,255,0.15);
+      border-radius: 8px;
+      color: #f3f4f6;
+      font-size: 1.1rem;
+      padding: 0.55rem 0.9rem;
+      flex: 1;
+      outline: none;
+      font-family: 'Courier New', monospace;
+      letter-spacing: 2px;
+      transition: border 0.2s;
+      -moz-appearance: textfield;
+    }
+    input[type=number]::-webkit-inner-spin-button { -webkit-appearance: none; }
+    input[type=number]:focus { border-color: #4ade80; }
+    input[type=number]:disabled { opacity: 0.5; cursor: not-allowed; }
+
+    .btn-stamp {
+      background: linear-gradient(135deg, #059669, #10b981);
+      color: white;
+      border: none;
+      border-radius: 8px;
+      padding: 0.5rem 1.2rem;
+      font-size: 0.95rem;
+      cursor: pointer;
+      font-family: Georgia, serif;
+      transition: opacity 0.2s, transform 0.1s;
+      white-space: nowrap;
+    }
+    .btn-stamp:hover { opacity: 0.9; transform: translateY(-1px); }
+    .btn-stamp:disabled { opacity: 0.4; cursor: not-allowed; transform: none; }
+
+    .error-msg { color: #f87171; font-size: 0.78rem; margin-top: 4px; }
+
+    /* Completion banner */
+    #completion {
+      display: none;
+      margin-top: 1.8rem;
+      text-align: center;
+      padding: 1.2rem;
+      background: rgba(20,83,45,0.4);
+      border-radius: 12px;
+      border: 1px solid #4ade8066;
+    }
+    #completion .emoji { font-size: 2rem; margin-bottom: 0.3rem; }
+    #completion .done-title { color: #4ade80; font-weight: bold; font-size: 1.1rem; letter-spacing: 0.05em; }
+    #completion .done-codes { color: #6ee7b7; font-size: 0.85rem; margin-top: 4px; }
+
+    /* Reset */
+    #btn-reset {
+      margin-top: 1.5rem;
+      background: transparent;
+      color: #9ca3af;
+      border: 1px solid #374151;
+      border-radius: 8px;
+      padding: 0.4rem 1rem;
+      font-size: 0.85rem;
+      cursor: pointer;
+      font-family: Georgia, serif;
+      transition: color 0.2s, border-color 0.2s;
+    }
+    #btn-reset:hover { color: #f87171; border-color: #f87171; }
+
+    @keyframes stamp {
+      0%   { transform: scale(1.5) rotate(-8deg); opacity: 0.5; }
+      60%  { transform: scale(0.9) rotate(2deg);  opacity: 1; }
+      100% { transform: scale(1)   rotate(0deg);  opacity: 1; }
+    }
+    @keyframes glow {
+      0%,100% { text-shadow: 0 0 10px #4ade80; }
+      50%      { text-shadow: 0 0 30px #4ade80, 0 0 60px #4ade80; }
+    }
+    .stamp-anim { animation: stamp 0.6s cubic-bezier(.36,.07,.19,.97); }
+  </style>
+</head>
+<body>
+
+  <div id="title">STEMPELPASS</div>
+  <div id="subtitle">Digitaler Nachweis · <span id="count">0</span>/3 Stempel</div>
+
+  <div class="card">
+    <div class="progress-row">
+      <span class="progress-label">Fortschritt</span>
+      <span class="progress-count"><span id="count2">0</span> / 3</span>
+    </div>
+    <div class="progress-track">
+      <div class="progress-fill" id="progress-fill"></div>
+    </div>
+
+    <!-- Station 1 -->
+    <div class="station" id="station-s1">
+      <div class="stamp-icon" id="icon-s1">
+        <svg viewBox="0 0 80 80" width="70" height="70">
+          <polygon id="hex-s1"
+            points="40,6 52,14 66,14 74,26 74,40 74,54 66,66 52,66 40,74 28,66 14,66 6,54 6,40 6,26 14,14 28,14"
+            fill="transparent" stroke="#6b7280" stroke-width="2.5"
+            style="transition: fill 0.4s, stroke 0.4s"/>
+          <text id="hextext-s1" x="40" y="46" text-anchor="middle" font-size="22" fill="#6b7280" font-family="serif">?</text>
+        </svg>
+      </div>
+      <div class="station-body">
+        <div class="station-label" id="label-s1">Station 1</div>
+        <div class="input-row" id="input-row-s1">
+          <input type="number" id="input-s1" placeholder="Code eingeben…" />
+          <button class="btn-stamp" onclick="handleSubmit('s1')">Stempeln</button>
+        </div>
+        <div class="error-msg" id="error-s1"></div>
+      </div>
+    </div>
+
+    <!-- Station 2 -->
+    <div class="station" id="station-s2">
+      <div class="stamp-icon" id="icon-s2">
+        <svg viewBox="0 0 80 80" width="70" height="70">
+          <polygon id="hex-s2"
+            points="40,6 52,14 66,14 74,26 74,40 74,54 66,66 52,66 40,74 28,66 14,66 6,54 6,40 6,26 14,14 28,14"
+            fill="transparent" stroke="#6b7280" stroke-width="2.5"
+            style="transition: fill 0.4s, stroke 0.4s"/>
+          <text id="hextext-s2" x="40" y="46" text-anchor="middle" font-size="22" fill="#6b7280" font-family="serif">?</text>
+        </svg>
+      </div>
+      <div class="station-body">
+        <div class="station-label" id="label-s2">Station 2</div>
+        <div class="input-row" id="input-row-s2">
+          <input type="number" id="input-s2" placeholder="Code eingeben…" />
+          <button class="btn-stamp" onclick="handleSubmit('s2')">Stempeln</button>
+        </div>
+        <div class="error-msg" id="error-s2"></div>
+      </div>
+    </div>
+
+    <!-- Station 3 -->
+    <div class="station" id="station-s3">
+      <div class="stamp-icon" id="icon-s3">
+        <svg viewBox="0 0 80 80" width="70" height="70">
+          <polygon id="hex-s3"
+            points="40,6 52,14 66,14 74,26 74,40 74,54 66,66 52,66 40,74 28,66 14,66 6,54 6,40 6,26 14,14 28,14"
+            fill="transparent" stroke="#6b7280" stroke-width="2.5"
+            style="transition: fill 0.4s, stroke 0.4s"/>
+          <text id="hextext-s3" x="40" y="46" text-anchor="middle" font-size="22" fill="#6b7280" font-family="serif">?</text>
+        </svg>
+      </div>
+      <div class="station-body">
+        <div class="station-label" id="label-s3">Station 3</div>
+        <div class="input-row" id="input-row-s3">
+          <input type="number" id="input-s3" placeholder="Code eingeben…" />
+          <button class="btn-stamp" onclick="handleSubmit('s3')">Stempeln</button>
+        </div>
+        <div class="error-msg" id="error-s3"></div>
+      </div>
+    </div>
+
+    <!-- Completion -->
+    <div id="completion">
+      <div class="emoji">🎉</div>
+      <div class="done-title">Alle Stempel gesammelt!</div>
+      <div class="done-codes" id="done-codes"></div>
+    </div>
+  </div>
+
+  <button id="btn-reset" onclick="handleReset()">↺ Zurücksetzen</button>
+
+  <script>
+    const STATIONS = ['s1', 's2', 's3'];
+    let state = { values: {s1:'',s2:'',s3:''}, submitted: {s1:false,s2:false,s3:false} };
+
+    // Load from localStorage
+    try {
+      const saved = localStorage.getItem('stempelpass-data');
+      if (saved) state = JSON.parse(saved);
+    } catch(e) {}
+
+    function save() {
+      try { localStorage.setItem('stempelpass-data', JSON.stringify(state)); } catch(e) {}
+    }
+
+    function handleSubmit(id) {
+      const input = document.getElementById('input-' + id);
+      const val = input.value.trim();
+      const errEl = document.getElementById('error-' + id);
+      if (val === '' || isNaN(Number(val))) {
+        errEl.textContent = 'Bitte eine gültige Zahl eingeben.';
+        return;
+      }
+      errEl.textContent = '';
+      state.values[id] = val;
+      state.submitted[id] = true;
+      save();
+      renderStation(id);
+      updateProgress();
+      checkDone();
+    }
+
+    function handleReset() {
+      state = { values: {s1:'',s2:'',s3:''}, submitted: {s1:false,s2:false,s3:false} };
+      save();
+      STATIONS.forEach(id => renderStation(id));
+      updateProgress();
+      document.body.classList.remove('done');
+      document.getElementById('completion').style.display = 'none';
+    }
+
+    function renderStation(id) {
+      const done = state.submitted[id];
+      const stationEl = document.getElementById('station-' + id);
+      const hex = document.getElementById('hex-' + id);
+      const hextext = document.getElementById('hextext-' + id);
+      const inputRow = document.getElementById('input-row-' + id);
+      const label = document.getElementById('label-' + id);
+      const icon = document.getElementById('icon-' + id);
+
+      if (done) {
+        stationEl.classList.add('stamped');
+        hex.setAttribute('fill', '#16a34a');
+        hex.setAttribute('stroke', '#4ade80');
+        hextext.setAttribute('fill', 'white');
+        hextext.textContent = '✓';
+        icon.style.filter = 'drop-shadow(0 0 12px #4ade8088)';
+        // animate
+        icon.classList.remove('stamp-anim');
+        void icon.offsetWidth; // reflow
+        icon.classList.add('stamp-anim');
+        setTimeout(() => icon.classList.remove('stamp-anim'), 700);
+        // hide input, show code
+        inputRow.style.display = 'none';
+        // add code hint if not already
+        let hint = label.querySelector('.station-code-hint');
+        if (!hint) {
+          hint = document.createElement('span');
+          hint.className = 'station-code-hint';
+          label.appendChild(hint);
+        }
+        hint.textContent = '· Code: ' + state.values[id];
+      } else {
+        stationEl.classList.remove('stamped');
+        hex.setAttribute('fill', 'transparent');
+        hex.setAttribute('stroke', '#6b7280');
+        hextext.setAttribute('fill', '#6b7280');
+        hextext.textContent = '?';
+        icon.style.filter = 'none';
+        inputRow.style.display = 'flex';
+        document.getElementById('input-' + id).value = state.values[id] || '';
+        const hint = label.querySelector('.station-code-hint');
+        if (hint) hint.remove();
+      }
+    }
+
+    function updateProgress() {
+      const n = STATIONS.filter(id => state.submitted[id]).length;
+      document.getElementById('count').textContent = n;
+      document.getElementById('count2').textContent = n;
+      document.getElementById('progress-fill').style.width = (n / 3 * 100) + '%';
+    }
+
+    function checkDone() {
+      const allDone = STATIONS.every(id => state.submitted[id]);
+      if (allDone) {
+        document.body.classList.add('done');
+        const comp = document.getElementById('completion');
+        comp.style.display = 'block';
+        document.getElementById('done-codes').textContent =
+          'Codes: ' + state.values.s1 + ' · ' + state.values.s2 + ' · ' + state.values.s3;
+      }
+    }
+
+    // Initial render
+    STATIONS.forEach(id => renderStation(id));
+    updateProgress();
+    checkDone();
+  </script>
+</body>
+</html>
