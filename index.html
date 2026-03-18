@@ -277,15 +277,16 @@
   <button id="btn-reset" onclick="handleReset()">↺ Zurücksetzen</button>
 
   <script>
-    // ─── CONFIG ──────────────────────────────────────────────────────────────
-    const SHEETS_URL = 'https://script.google.com/macros/s/AKfycbyxQ3zE79_WvBcJ5GNQUGwEUM9MxXOH5DYaR5mZ4qfi_y6l_CsY2D4vUKyM4hzYFDQCOg/exec';
+    // ─── CONFIG ───────────────────────────────────────────────────────────────
+    const SHEETS_URL = 'https://script.google.com/macros/s/AKfycbzwON6baGSfUMD0Aj0ZgZ_wxzENzeHcYGducGTPgBmdijRUpFZ_JS0PMIXXGHb2g6zafA/exec';
+    const MIN_VAL = 30;
+    const MAX_VAL = 100;
     // ─────────────────────────────────────────────────────────────────────────
 
     const STATIONS = ['s1', 's2', 's3'];
     let state = { values: {s1:'',s2:'',s3:''}, submitted: {s1:false,s2:false,s3:false} };
 
-    // ── Anonymous ID ─────────────────────────────────────────────────────────
-    // Persisted in localStorage — same browser = same ID across visits.
+    // ── Anonymous ID — persisted in localStorage, same browser = same ID ─────
     function getOrCreateAnonId() {
       const KEY = 'stempelpass-anon-id';
       let id = null;
@@ -300,8 +301,7 @@
     }
     const ANON_ID = getOrCreateAnonId();
 
-    // ── Session ID ────────────────────────────────────────────────────────────
-    // New ID every time the page is loaded — links stamps from a single visit.
+    // ── Session ID — new every page load, groups stamps from one visit ────────
     const SESSION_ID = 'sess-' + Math.random().toString(36).slice(2, 10);
 
     // Load saved progress
@@ -314,36 +314,44 @@
       try { localStorage.setItem('stempelpass-data', JSON.stringify(state)); } catch(e) {}
     }
 
-function logToSheets(station, value) {
-  const params = new URLSearchParams({
-    timestamp: new Date().toISOString(),
-    anonId:    ANON_ID,
-    sessionId: SESSION_ID,
-    station:   station,
-    value:     value,
-    userAgent: navigator.userAgent
-  });
-  fetch(SHEETS_URL, {
-    method: 'POST',
-    mode: 'no-cors',
-    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-    body: params.toString()
-  }).catch(() => {});
-}
+    // ── Send one row to Google Sheets via form-encoded POST ───────────────────
+    function logToSheets(station, value) {
+      const params = new URLSearchParams({
+        timestamp: new Date().toISOString(),
+        anonId:    ANON_ID,
+        sessionId: SESSION_ID,
+        station:   station,
+        value:     value,
+        userAgent: navigator.userAgent
+      });
+      fetch(SHEETS_URL, {
+        method: 'POST',
+        mode: 'no-cors',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: params.toString()
+      }).catch(() => {});
+    }
 
     function handleSubmit(id) {
       const input = document.getElementById('input-' + id);
       const val = input.value.trim();
+      const num = Number(val);
       const errEl = document.getElementById('error-' + id);
-      if (val === '' || isNaN(Number(val))) {
+
+      if (val === '' || isNaN(num)) {
         errEl.textContent = 'Bitte eine gültige Zahl eingeben.';
         return;
       }
+      if (num < MIN_VAL || num > MAX_VAL) {
+        errEl.textContent = `Wert muss zwischen ${MIN_VAL} und ${MAX_VAL} dB liegen.`;
+        return;
+      }
+
       errEl.textContent = '';
       state.values[id] = val;
       state.submitted[id] = true;
       save();
-      logToSheets(id, val); // ← log immediately on each stamp
+      logToSheets(id, val);
       renderStation(id);
       updateProgress();
       checkDone();
