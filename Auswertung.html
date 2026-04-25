@@ -366,21 +366,40 @@
     }
   }
 
+  // Parst Timestamps robust: ISO-String, Date-Objekt oder US-Format ("3/20/2026 9:46:18")
+  function parseTimestamp(t) {
+    if (!t) return null;
+    if (t instanceof Date) return isNaN(t.getTime()) ? null : t;
+    let d = new Date(t);
+    if (!isNaN(d.getTime())) return d;
+    // Fallback für US-Format wie "3/20/2026 9:46:18"
+    if (typeof t === 'string') {
+      const m = t.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})\s+(\d{1,2}):(\d{1,2})(?::(\d{1,2}))?$/);
+      if (m) {
+        d = new Date(+m[3], +m[1]-1, +m[2], +m[4], +m[5], +(m[6]||0));
+        if (!isNaN(d.getTime())) return d;
+      }
+    }
+    return null;
+  }
+
   function updateGlobalStats() {
     document.getElementById('stat-total').textContent = rawData.length;
     const ids = new Set(rawData.map(r => r.anonId).filter(Boolean));
     document.getElementById('stat-ids').textContent = ids.size;
     if (rawData.length) {
-      const sorted = [...rawData].sort((a, b) =>
-        new Date(b.timestamp) - new Date(a.timestamp));
-      const last = sorted[0].timestamp;
-      try {
+      const withDates = rawData
+        .map(r => ({ raw: r.timestamp, date: parseTimestamp(r.timestamp) }))
+        .filter(x => x.date !== null);
+      if (withDates.length) {
+        withDates.sort((a, b) => b.date - a.date);
+        const lastDate = withDates[0].date;
         document.getElementById('stat-last').textContent =
-          new Date(last).toLocaleString('de-AT', {
+          lastDate.toLocaleString('de-AT', {
             day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit'
           });
-      } catch(e) {
-        document.getElementById('stat-last').textContent = last || '–';
+      } else {
+        document.getElementById('stat-last').textContent = '–';
       }
     } else {
       document.getElementById('stat-last').textContent = '–';
