@@ -1,0 +1,533 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Stempelpass · Auswertung</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:wght@500;700&family=JetBrains+Mono:wght@500;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --green-dark: #2d5a0a;
+      --green-mid:  #3a6b0e;
+      --green:      #5a8f1a;
+      --green-light:#8dc63f;
+      --bg:         #eef2e4;
+      --card:       #ffffff;
+      --border:     #c8d8a8;
+      --text:       #1f2a16;
+      --text-soft:  #6b7a60;
+      --error:      #b8391f;
+    }
+
+    body {
+      min-height: 100vh;
+      font-family: 'Inter', system-ui, sans-serif;
+      padding: 2.5rem 1rem 4rem;
+      background: var(--bg);
+      background-image:
+        radial-gradient(ellipse at top, rgba(141,198,63,0.18), transparent 60%),
+        radial-gradient(ellipse at bottom, rgba(58,107,14,0.08), transparent 60%);
+      color: var(--text);
+    }
+
+    .container {
+      max-width: 1080px;
+      margin: 0 auto;
+    }
+
+    header {
+      text-align: center;
+      margin-bottom: 1.8rem;
+    }
+    h1 {
+      font-family: 'Fraunces', Georgia, serif;
+      font-size: 2.4rem;
+      letter-spacing: 0.04em;
+      color: var(--green-mid);
+      font-weight: 700;
+      margin-bottom: 0.25rem;
+    }
+    .subtitle {
+      font-family: 'JetBrains Mono', monospace;
+      color: var(--text-soft);
+      font-size: 0.74rem;
+      letter-spacing: 0.22em;
+      text-transform: uppercase;
+      margin-bottom: 0.8rem;
+    }
+    .top-bar {
+      width: 100%;
+      max-width: 480px;
+      margin: 0 auto;
+      height: 3px;
+      background: linear-gradient(90deg, var(--green-mid), var(--green-light));
+      border-radius: 3px;
+      opacity: 0.85;
+    }
+
+    .toolbar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 1rem;
+      margin: 1.6rem 0 1.2rem;
+      padding: 0.9rem 1.2rem;
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      box-shadow: 0 1px 2px rgba(58,107,14,0.06), 0 6px 18px rgba(58,107,14,0.08);
+    }
+    .stat-group {
+      display: flex;
+      gap: 1.6rem;
+      flex-wrap: wrap;
+    }
+    .stat {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.85rem;
+      color: var(--text);
+    }
+    .stat .label {
+      display: block;
+      font-size: 0.68rem;
+      text-transform: uppercase;
+      letter-spacing: 0.18em;
+      color: var(--text-soft);
+      margin-bottom: 2px;
+    }
+    .stat .value {
+      font-weight: 700;
+      color: var(--green-mid);
+      font-size: 1.05rem;
+    }
+    .controls {
+      display: flex;
+      gap: 0.6rem;
+      align-items: center;
+    }
+    .bin-control {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.78rem;
+      color: var(--text-soft);
+      display: flex;
+      align-items: center;
+      gap: 0.4rem;
+    }
+    .bin-control select {
+      font-family: inherit;
+      font-size: 0.82rem;
+      padding: 0.3rem 0.5rem;
+      border: 1px solid #b8c898;
+      border-radius: 6px;
+      background: white;
+      color: var(--text);
+      outline: none;
+      cursor: pointer;
+    }
+    .bin-control select:focus {
+      border-color: var(--green-mid);
+      box-shadow: 0 0 0 3px rgba(58,107,14,0.14);
+    }
+    .btn-refresh {
+      background: linear-gradient(135deg, var(--green-mid), var(--green));
+      color: white;
+      border: none;
+      border-radius: 7px;
+      padding: 0.5rem 1rem;
+      font-size: 0.82rem;
+      cursor: pointer;
+      font-family: 'Inter', sans-serif;
+      font-weight: 600;
+      letter-spacing: 0.02em;
+      transition: opacity 0.2s, transform 0.1s, box-shadow 0.2s;
+      box-shadow: 0 1px 2px rgba(45,90,10,0.25);
+    }
+    .btn-refresh:hover { opacity: 0.92; transform: translateY(-1px); box-shadow: 0 3px 8px rgba(45,90,10,0.30); }
+    .btn-refresh:active { transform: translateY(0); }
+    .btn-refresh:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+
+    .grid {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 1.1rem;
+    }
+    @media (min-width: 860px) {
+      .grid { grid-template-columns: 1fr 1fr 1fr; }
+    }
+
+    .chart-card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 1.2rem 1.2rem 0.9rem;
+      box-shadow: 0 1px 2px rgba(58,107,14,0.06), 0 6px 18px rgba(58,107,14,0.08);
+    }
+    .chart-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+      margin-bottom: 0.85rem;
+      gap: 1rem;
+    }
+    .chart-title {
+      font-family: 'Fraunces', serif;
+      font-weight: 700;
+      font-size: 1.1rem;
+      color: var(--green-mid);
+      letter-spacing: 0.01em;
+    }
+    .chart-stats {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.72rem;
+      color: var(--text-soft);
+      letter-spacing: 0.04em;
+      text-align: right;
+      line-height: 1.5;
+    }
+    .chart-stats .n { color: var(--green-mid); font-weight: 700; }
+
+    .chart-svg {
+      width: 100%;
+      height: auto;
+      display: block;
+    }
+    .bar { fill: var(--green); transition: fill 0.2s; cursor: default; }
+    .bar:hover { fill: var(--green-mid); }
+    .axis-line { stroke: #c8d4b0; stroke-width: 1; }
+    .axis-tick { stroke: #c8d4b0; stroke-width: 1; }
+    .axis-label {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 9px;
+      fill: var(--text-soft);
+    }
+    .axis-title {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 9px;
+      fill: var(--text-soft);
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+    }
+    .mean-line { stroke: var(--error); stroke-width: 1.5; stroke-dasharray: 4 3; opacity: 0.75; }
+    .mean-label {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 9px;
+      fill: var(--error);
+      font-weight: 700;
+    }
+
+    .empty-msg {
+      font-family: 'Inter', sans-serif;
+      color: var(--text-soft);
+      font-size: 0.85rem;
+      text-align: center;
+      padding: 2rem 1rem;
+      font-style: italic;
+    }
+
+    .status-bar {
+      margin-top: 1.4rem;
+      text-align: center;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.72rem;
+      color: var(--text-soft);
+      letter-spacing: 0.05em;
+    }
+    .status-bar.error { color: var(--error); }
+
+    .loading {
+      display: flex;
+      justify-content: center;
+      padding: 3rem 1rem;
+    }
+    .spinner {
+      width: 32px;
+      height: 32px;
+      border: 3px solid #d6e4bf;
+      border-top-color: var(--green-mid);
+      border-radius: 50%;
+      animation: spin 0.9s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    @media (max-width: 600px) {
+      h1 { font-size: 2rem; }
+      .toolbar { padding: 0.8rem; }
+      .stat-group { gap: 1rem; }
+      .controls { width: 100%; justify-content: space-between; }
+    }
+  </style>
+</head>
+<body>
+
+<div class="container">
+  <header>
+    <h1>Auswertung</h1>
+    <div class="subtitle">Stempelpass · Histogramm der Messwerte</div>
+    <div class="top-bar"></div>
+  </header>
+
+  <div class="toolbar">
+    <div class="stat-group">
+      <div class="stat">
+        <span class="label">Einträge gesamt</span>
+        <span class="value" id="stat-total">–</span>
+      </div>
+      <div class="stat">
+        <span class="label">Unique IDs</span>
+        <span class="value" id="stat-ids">–</span>
+      </div>
+      <div class="stat">
+        <span class="label">Letzter Eintrag</span>
+        <span class="value" id="stat-last">–</span>
+      </div>
+    </div>
+    <div class="controls">
+      <label class="bin-control">
+        Klassenbreite
+        <select id="bin-select">
+          <option value="1">1 dB</option>
+          <option value="2">2 dB</option>
+          <option value="5" selected>5 dB</option>
+          <option value="10">10 dB</option>
+        </select>
+      </label>
+      <button class="btn-refresh" id="btn-refresh" onclick="loadData()">↻ Aktualisieren</button>
+    </div>
+  </div>
+
+  <div id="content">
+    <div class="loading"><div class="spinner"></div></div>
+  </div>
+
+  <div class="status-bar" id="status">Daten werden geladen…</div>
+</div>
+
+<script>
+  // ─── CONFIG ───────────────────────────────────────────────────────────────
+  const SHEETS_URL = 'https://script.google.com/macros/s/AKfycbzwON6baGSfUMD0Aj0ZgZ_wxzENzeHcYGducGTPgBmdijRUpFZ_JS0PMIXXGHb2g6zafA/exec';
+  const MIN_VAL = 30;
+  const MAX_VAL = 100;
+  // ─────────────────────────────────────────────────────────────────────────
+
+  const STATIONS = ['s1', 's2', 's3'];
+  let rawData = [];
+
+  document.getElementById('bin-select').addEventListener('change', renderAll);
+
+  async function loadData() {
+    const btn = document.getElementById('btn-refresh');
+    const statusEl = document.getElementById('status');
+    const contentEl = document.getElementById('content');
+
+    btn.disabled = true;
+    statusEl.classList.remove('error');
+    statusEl.textContent = 'Daten werden geladen…';
+    contentEl.innerHTML = '<div class="loading"><div class="spinner"></div></div>';
+
+    try {
+      const url = SHEETS_URL + '?action=read&t=' + Date.now();
+      const res = await fetch(url, { method: 'GET' });
+      if (!res.ok) throw new Error('HTTP ' + res.status);
+      const data = await res.json();
+
+      // Erwartet: { rows: [{timestamp, anonId, sessionId, station, value, ...}, ...] }
+      // Tolerant gegenüber alternativen Strukturen:
+      let rows = [];
+      if (Array.isArray(data)) rows = data;
+      else if (Array.isArray(data.rows)) rows = data.rows;
+      else if (Array.isArray(data.data)) rows = data.data;
+      else throw new Error('Unerwartetes Datenformat');
+
+      rawData = rows
+        .map(r => ({
+          timestamp: r.timestamp || r.Timestamp || '',
+          anonId:    r.anonId    || r.AnonId    || '',
+          station:   String(r.station || r.Station || '').toLowerCase(),
+          value:     Number(r.value || r.Value)
+        }))
+        .filter(r => STATIONS.includes(r.station) && Number.isFinite(r.value));
+
+      updateGlobalStats();
+      renderAll();
+      statusEl.textContent = 'Aktualisiert: ' + new Date().toLocaleString('de-AT');
+    } catch (err) {
+      console.error(err);
+      statusEl.classList.add('error');
+      statusEl.textContent = 'Fehler beim Laden: ' + err.message
+        + ' — bitte prüfen, ob das Apps Script eine doGet()-Funktion hat (siehe Anleitung).';
+      contentEl.innerHTML = '<div class="empty-msg">Keine Daten verfügbar.</div>';
+    } finally {
+      btn.disabled = false;
+    }
+  }
+
+  function updateGlobalStats() {
+    document.getElementById('stat-total').textContent = rawData.length;
+    const ids = new Set(rawData.map(r => r.anonId).filter(Boolean));
+    document.getElementById('stat-ids').textContent = ids.size;
+    if (rawData.length) {
+      const sorted = [...rawData].sort((a, b) =>
+        new Date(b.timestamp) - new Date(a.timestamp));
+      const last = sorted[0].timestamp;
+      try {
+        document.getElementById('stat-last').textContent =
+          new Date(last).toLocaleString('de-AT', {
+            day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit'
+          });
+      } catch(e) {
+        document.getElementById('stat-last').textContent = last || '–';
+      }
+    } else {
+      document.getElementById('stat-last').textContent = '–';
+    }
+  }
+
+  function computeStats(values) {
+    if (!values.length) return null;
+    const sorted = [...values].sort((a, b) => a - b);
+    const n = sorted.length;
+    const sum = sorted.reduce((a, b) => a + b, 0);
+    const mean = sum / n;
+    const median = n % 2 ? sorted[(n - 1) / 2] : (sorted[n/2 - 1] + sorted[n/2]) / 2;
+    return { n, mean, median, min: sorted[0], max: sorted[n - 1] };
+  }
+
+  function buildHistogram(values, binWidth, rangeMin, rangeMax) {
+    const start = Math.floor(rangeMin / binWidth) * binWidth;
+    const end = Math.ceil(rangeMax / binWidth) * binWidth;
+    const bins = [];
+    for (let x = start; x < end; x += binWidth) {
+      bins.push({ from: x, to: x + binWidth, count: 0 });
+    }
+    if (!bins.length) return bins;
+    values.forEach(v => {
+      let idx = Math.floor((v - start) / binWidth);
+      if (idx === bins.length) idx = bins.length - 1; // include max
+      if (idx >= 0 && idx < bins.length) bins[idx].count++;
+    });
+    return bins;
+  }
+
+  function renderHistogram(values, title, color) {
+    const stats = computeStats(values);
+    if (!stats) {
+      return `
+        <div class="chart-card">
+          <div class="chart-header">
+            <div class="chart-title">${title}</div>
+            <div class="chart-stats"><span class="n">0</span> Einträge</div>
+          </div>
+          <div class="empty-msg">Noch keine Daten.</div>
+        </div>`;
+    }
+
+    const binWidth = parseInt(document.getElementById('bin-select').value, 10);
+    const bins = buildHistogram(values, binWidth, MIN_VAL, MAX_VAL);
+    const maxCount = Math.max(...bins.map(b => b.count), 1);
+
+    // SVG dimensions
+    const W = 320, H = 220;
+    const M = { top: 14, right: 14, bottom: 36, left: 30 };
+    const innerW = W - M.left - M.right;
+    const innerH = H - M.top - M.bottom;
+
+    const xMin = bins[0].from;
+    const xMax = bins[bins.length - 1].to;
+    const xScale = v => M.left + ((v - xMin) / (xMax - xMin)) * innerW;
+    const yScale = v => M.top + innerH - (v / maxCount) * innerH;
+
+    // X-axis ticks every 10
+    const xTicks = [];
+    const tickStart = Math.ceil(xMin / 10) * 10;
+    for (let t = tickStart; t <= xMax; t += 10) xTicks.push(t);
+
+    // Y-axis ticks (max 5)
+    const yTicks = [];
+    const yStep = Math.max(1, Math.ceil(maxCount / 4));
+    for (let t = 0; t <= maxCount; t += yStep) yTicks.push(t);
+    if (yTicks[yTicks.length - 1] !== maxCount) yTicks.push(maxCount);
+
+    const meanX = xScale(stats.mean);
+
+    const barsSvg = bins.map(b => {
+      if (b.count === 0) return '';
+      const x = xScale(b.from);
+      const w = Math.max(1, xScale(b.to) - xScale(b.from) - 1);
+      const y = yScale(b.count);
+      const h = M.top + innerH - y;
+      return `<rect class="bar" x="${x}" y="${y}" width="${w}" height="${h}"
+        style="fill:${color}">
+        <title>${b.from}–${b.to} dB: ${b.count}</title>
+      </rect>`;
+    }).join('');
+
+    const xLabelsSvg = xTicks.map(t => {
+      const x = xScale(t);
+      return `<line class="axis-tick" x1="${x}" x2="${x}" y1="${M.top + innerH}" y2="${M.top + innerH + 3}"/>
+              <text class="axis-label" x="${x}" y="${M.top + innerH + 13}" text-anchor="middle">${t}</text>`;
+    }).join('');
+
+    const yLabelsSvg = yTicks.map(t => {
+      const y = yScale(t);
+      return `<line class="axis-tick" x1="${M.left - 3}" x2="${M.left}" y1="${y}" y2="${y}"/>
+              <text class="axis-label" x="${M.left - 5}" y="${y + 3}" text-anchor="end">${t}</text>`;
+    }).join('');
+
+    const meanLineSvg = `
+      <line class="mean-line" x1="${meanX}" x2="${meanX}" y1="${M.top}" y2="${M.top + innerH}"/>
+      <text class="mean-label" x="${meanX + 4}" y="${M.top + 9}">x̄ ${stats.mean.toFixed(1)}</text>
+    `;
+
+    return `
+      <div class="chart-card">
+        <div class="chart-header">
+          <div class="chart-title">${title}</div>
+          <div class="chart-stats">
+            <span class="n">${stats.n}</span> Einträge<br>
+            x̄ ${stats.mean.toFixed(1)} · Md ${stats.median.toFixed(1)} · ${stats.min}–${stats.max} dB
+          </div>
+        </div>
+        <svg class="chart-svg" viewBox="0 0 ${W} ${H}" preserveAspectRatio="xMidYMid meet">
+          <line class="axis-line" x1="${M.left}" x2="${M.left + innerW}" y1="${M.top + innerH}" y2="${M.top + innerH}"/>
+          <line class="axis-line" x1="${M.left}" x2="${M.left}" y1="${M.top}" y2="${M.top + innerH}"/>
+          ${barsSvg}
+          ${xLabelsSvg}
+          ${yLabelsSvg}
+          ${meanLineSvg}
+          <text class="axis-title" x="${M.left + innerW / 2}" y="${H - 4}" text-anchor="middle">Messwert [dB]</text>
+        </svg>
+      </div>
+    `;
+  }
+
+  function renderAll() {
+    const colors = {
+      s1: '#5a8f1a',
+      s2: '#3a6b0e',
+      s3: '#8dc63f'
+    };
+    const labels = {
+      s1: 'Station 1',
+      s2: 'Station 2',
+      s3: 'Station 3'
+    };
+
+    const html = '<div class="grid">' +
+      STATIONS.map(s => {
+        const values = rawData.filter(r => r.station === s).map(r => r.value);
+        return renderHistogram(values, labels[s], colors[s]);
+      }).join('') +
+      '</div>';
+
+    document.getElementById('content').innerHTML = html;
+  }
+
+  loadData();
+</script>
+</body>
+</html>
