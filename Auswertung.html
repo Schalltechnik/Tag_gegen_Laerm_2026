@@ -180,6 +180,7 @@
       font-size: 1.1rem;
       color: var(--green-mid);
       letter-spacing: 0.01em;
+      white-space: nowrap;
     }
     .chart-stats {
       font-family: 'JetBrains Mono', monospace;
@@ -187,7 +188,8 @@
       color: var(--text-soft);
       letter-spacing: 0.04em;
       text-align: right;
-      line-height: 1.5;
+      line-height: 1.6;
+      white-space: nowrap;
     }
     .chart-stats .n { color: var(--green-mid); font-weight: 700; }
 
@@ -500,7 +502,7 @@
 
     const meanLineSvg = `
       <line class="mean-line" x1="${meanX}" x2="${meanX}" y1="${M.top}" y2="${M.top + innerH}"/>
-      <text class="mean-label" x="${meanX + 4}" y="${M.top + 9}">x̄ ${stats.mean.toFixed(1)}</text>
+      <text class="mean-label" x="${meanX + 4}" y="${M.top + 9}">MW ${stats.mean.toFixed(1)} dB</text>
     `;
 
     return `
@@ -509,7 +511,8 @@
           <div class="chart-title">${title}</div>
           <div class="chart-stats">
             <span class="n">${stats.n}</span> Einträge<br>
-            x̄ ${stats.mean.toFixed(1)} · Md ${stats.median.toFixed(1)} · ${stats.min}–${stats.max} dB
+            MW ${stats.mean.toFixed(1)} dB<br>
+            Md ${stats.median.toFixed(1)} dB · ${stats.min}–${stats.max} dB
           </div>
         </div>
         <svg class="chart-svg" viewBox="0 0 ${W} ${H}" preserveAspectRatio="xMidYMid meet">
