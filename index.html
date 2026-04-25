@@ -1,67 +1,566 @@
-// ============================================================
-// Apps Script für Stempelpass
-// Im Google Apps Script Editor (script.google.com) einfügen,
-// speichern und neu deployen (als Web App, "Anyone").
-// ============================================================
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Stempelpass</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:wght@500;700&family=JetBrains+Mono:wght@500;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
-// Name des Tabellenblatts (anpassen falls nötig)
-const SHEET_NAME = 'Sheet1';
-
-// ─── SCHREIBEN: vom Stempelpass aufgerufen ──────────────────
-function doPost(e) {
-  try {
-    const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_NAME);
-    const p = e.parameter;
-
-    // Header anlegen, falls Sheet leer
-    if (sheet.getLastRow() === 0) {
-      sheet.appendRow(['timestamp','anonId','sessionId','station','value','userAgent']);
+    :root {
+      --green-dark: #2d5a0a;
+      --green-mid:  #3a6b0e;
+      --green:      #5a8f1a;
+      --green-light:#8dc63f;
+      --bg:         #eef2e4;
+      --bg-done:    #b8d98a;
+      --card:       #ffffff;
+      --card-done:  #ecf6d4;
+      --border:     #c8d8a8;
+      --border-done:#5a8f1a;
+      --text:       #1f2a16;
+      --text-soft:  #6b7a60;
+      --error:      #b8391f;
     }
 
-    sheet.appendRow([
-      p.timestamp || new Date().toISOString(),
-      p.anonId    || '',
-      p.sessionId || '',
-      p.station   || '',
-      p.value     || '',
-      p.userAgent || ''
-    ]);
+    html { font-size: 16px; }
 
-    return ContentService
-      .createTextOutput(JSON.stringify({ ok: true }))
-      .setMimeType(ContentService.MimeType.JSON);
-  } catch (err) {
-    return ContentService
-      .createTextOutput(JSON.stringify({ ok: false, error: String(err) }))
-      .setMimeType(ContentService.MimeType.JSON);
-  }
-}
+    body {
+      min-height: 100vh;
+      font-family: 'Inter', system-ui, sans-serif;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 2.5rem 1rem;
+      background: var(--bg);
+      background-image:
+        radial-gradient(ellipse at top, rgba(141,198,63,0.18), transparent 60%),
+        radial-gradient(ellipse at bottom, rgba(58,107,14,0.08), transparent 60%);
+      transition: background 1.2s ease;
+      color: var(--text);
+    }
+    body.done { background-color: var(--bg-done); }
 
-// ─── LESEN: von der Auswertungsseite aufgerufen ─────────────
-function doGet(e) {
-  try {
-    const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_NAME);
-    const data = sheet.getDataRange().getValues();
-
-    if (data.length < 2) {
-      return ContentService
-        .createTextOutput(JSON.stringify({ rows: [] }))
-        .setMimeType(ContentService.MimeType.JSON);
+    #title {
+      font-family: 'Fraunces', Georgia, serif;
+      font-size: 2.4rem;
+      letter-spacing: 0.04em;
+      color: var(--green-mid);
+      text-align: center;
+      margin-bottom: 0.25rem;
+      font-weight: 700;
+      transition: color 1s;
+    }
+    body.done #title {
+      color: var(--green-dark);
+      animation: glow 2.4s ease-in-out infinite;
+    }
+    #subtitle {
+      font-family: 'JetBrains Mono', monospace;
+      color: var(--text-soft);
+      font-size: 0.74rem;
+      letter-spacing: 0.22em;
+      text-transform: uppercase;
+      text-align: center;
+      margin-bottom: 0.8rem;
     }
 
-    const headers = data[0].map(h => String(h));
-    const rows = data.slice(1).map(row => {
-      const obj = {};
-      headers.forEach((h, i) => { obj[h] = row[i]; });
-      return obj;
+    .top-bar {
+      width: 100%;
+      max-width: 480px;
+      height: 3px;
+      background: linear-gradient(90deg, var(--green-mid), var(--green-light));
+      border-radius: 3px;
+      margin-bottom: 1.6rem;
+      opacity: 0.85;
+    }
+
+    .card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 2.4rem 2rem;
+      max-width: 480px;
+      width: 100%;
+      box-shadow:
+        0 1px 2px rgba(58,107,14,0.06),
+        0 8px 24px rgba(58,107,14,0.10);
+      transition: all 1s ease;
+    }
+    body.done .card {
+      background: var(--card-done);
+      border-color: var(--border-done);
+      box-shadow:
+        0 0 0 1px rgba(58,107,14,0.15),
+        0 0 50px rgba(58,107,14,0.30),
+        0 8px 24px rgba(58,107,14,0.18);
+    }
+
+    .progress-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+      margin-bottom: 8px;
+    }
+    .progress-label {
+      font-family: 'JetBrains Mono', monospace;
+      color: var(--text-soft);
+      font-size: 0.72rem;
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+    }
+    .progress-count {
+      font-family: 'JetBrains Mono', monospace;
+      color: var(--green-mid);
+      font-size: 0.85rem;
+      font-weight: 700;
+      letter-spacing: 0.05em;
+    }
+    .progress-track {
+      background: #e2ecd0;
+      border-radius: 999px;
+      height: 6px;
+      overflow: hidden;
+      margin-bottom: 1.8rem;
+      position: relative;
+    }
+    .progress-fill {
+      background: linear-gradient(90deg, var(--green-mid), var(--green-light));
+      height: 100%;
+      border-radius: 999px;
+      width: 0%;
+      transition: width 0.7s cubic-bezier(.22,.61,.36,1);
+      position: relative;
+      overflow: hidden;
+    }
+    .progress-fill::after {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(90deg, transparent, rgba(255,255,255,0.45), transparent);
+      animation: shimmer 2.4s linear infinite;
+    }
+
+    .station {
+      background: #f5f9ec;
+      border: 1px solid #d6e4bf;
+      border-radius: 12px;
+      padding: 1rem 1.1rem;
+      margin-bottom: 0.85rem;
+      transition: background 0.5s ease, border-color 0.5s ease;
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+    }
+    .station.stamped {
+      background: #e0efc6;
+      border-color: var(--green);
+    }
+    .stamp-icon { flex-shrink: 0; }
+    .stamp-icon svg { display: block; }
+    .station-body { flex: 1; min-width: 0; }
+    .station-label {
+      font-family: 'Fraunces', Georgia, serif;
+      color: var(--text);
+      font-weight: 700;
+      font-size: 1.05rem;
+      letter-spacing: 0.01em;
+      margin-bottom: 0.55rem;
+      transition: color 0.4s;
+    }
+    .station.stamped .station-label { color: var(--green-mid); }
+    .station-code-hint {
+      font-family: 'JetBrains Mono', monospace;
+      margin-left: 10px;
+      font-size: 0.78rem;
+      color: var(--green);
+      font-weight: 500;
+      letter-spacing: 0.05em;
+    }
+
+    .input-row { display: flex; gap: 0.5rem; align-items: center; }
+    input[type=number] {
+      background: #ffffff;
+      border: 1px solid #b8c898;
+      border-radius: 7px;
+      color: var(--text);
+      font-size: 1rem;
+      padding: 0.55rem 0.8rem;
+      flex: 1;
+      min-width: 0;
+      outline: none;
+      font-family: 'JetBrains Mono', monospace;
+      letter-spacing: 1px;
+      transition: border 0.2s, box-shadow 0.2s;
+      -moz-appearance: textfield;
+    }
+    input[type=number]::placeholder {
+      font-family: 'Inter', sans-serif;
+      letter-spacing: 0;
+      color: #a0b088;
+    }
+    input[type=number]::-webkit-inner-spin-button,
+    input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+    input[type=number]:focus {
+      border-color: var(--green-mid);
+      box-shadow: 0 0 0 3px rgba(58,107,14,0.14);
+    }
+
+    .btn-stamp {
+      background: linear-gradient(135deg, var(--green-mid), var(--green));
+      color: white;
+      border: none;
+      border-radius: 7px;
+      padding: 0.55rem 1.1rem;
+      font-size: 0.88rem;
+      cursor: pointer;
+      font-family: 'Inter', sans-serif;
+      font-weight: 600;
+      letter-spacing: 0.02em;
+      transition: opacity 0.2s, transform 0.1s, box-shadow 0.2s;
+      white-space: nowrap;
+      box-shadow: 0 1px 2px rgba(45,90,10,0.25);
+    }
+    .btn-stamp:hover {
+      opacity: 0.92;
+      transform: translateY(-1px);
+      box-shadow: 0 3px 8px rgba(45,90,10,0.30);
+    }
+    .btn-stamp:active { transform: translateY(0); }
+    .btn-stamp:disabled { opacity: 0.4; cursor: not-allowed; transform: none; box-shadow: none; }
+
+    .error-msg {
+      color: var(--error);
+      font-size: 0.76rem;
+      margin-top: 5px;
+      letter-spacing: 0.01em;
+    }
+
+    #completion {
+      display: none;
+      margin-top: 1.6rem;
+      text-align: center;
+      padding: 1.3rem 1rem;
+      background: linear-gradient(180deg, #cfeb98, #b8d98a);
+      border-radius: 12px;
+      border: 1.5px solid var(--green-mid);
+    }
+    #completion .emoji { font-size: 2rem; margin-bottom: 0.25rem; }
+    #completion .done-title {
+      font-family: 'Fraunces', serif;
+      color: var(--green-dark);
+      font-weight: 700;
+      font-size: 1.1rem;
+      letter-spacing: 0.02em;
+    }
+    #completion .done-codes {
+      font-family: 'JetBrains Mono', monospace;
+      color: var(--green-mid);
+      font-size: 0.85rem;
+      margin-top: 6px;
+      letter-spacing: 0.05em;
+    }
+    #completion .done-id {
+      font-family: 'JetBrains Mono', monospace;
+      color: var(--text-soft);
+      font-size: 0.7rem;
+      margin-top: 8px;
+      letter-spacing: 0.03em;
+    }
+
+    #btn-reset {
+      margin-top: 1.2rem;
+      background: transparent;
+      color: var(--text-soft);
+      border: 1px solid #b8c898;
+      border-radius: 7px;
+      padding: 0.4rem 1rem;
+      font-size: 0.8rem;
+      cursor: pointer;
+      font-family: 'Inter', sans-serif;
+      letter-spacing: 0.02em;
+      transition: color 0.2s, border-color 0.2s;
+    }
+    #btn-reset:hover { color: var(--error); border-color: var(--error); }
+
+    @keyframes stamp {
+      0%   { transform: scale(1.6) rotate(-10deg); opacity: 0.4; }
+      55%  { transform: scale(0.88) rotate(3deg);   opacity: 1; }
+      100% { transform: scale(1)    rotate(0deg);   opacity: 1; }
+    }
+    @keyframes glow {
+      0%, 100% { text-shadow: 0 0 6px rgba(58,107,14,0.35); }
+      50%      { text-shadow: 0 0 22px rgba(58,107,14,0.85), 0 0 38px rgba(141,198,63,0.4); }
+    }
+    @keyframes shimmer {
+      0%   { transform: translateX(-100%); }
+      100% { transform: translateX(100%); }
+    }
+    .stamp-anim { animation: stamp 0.65s cubic-bezier(.36,.07,.19,.97); }
+
+    @media (max-width: 420px) {
+      #title { font-size: 2rem; }
+      .card { padding: 1.8rem 1.2rem; }
+      .station { padding: 0.85rem 0.9rem; gap: 0.75rem; }
+      .stamp-icon svg { width: 56px; height: 56px; }
+    }
+  </style>
+</head>
+<body>
+
+  <div id="title">Stempelpass</div>
+  <div id="subtitle">Digitaler Nachweis · <span id="count">0</span>/3 Stempel</div>
+  <div class="top-bar"></div>
+
+  <div class="card">
+    <div class="progress-row">
+      <span class="progress-label">Fortschritt</span>
+      <span class="progress-count"><span id="count2">0</span> / 3</span>
+    </div>
+    <div class="progress-track">
+      <div class="progress-fill" id="progress-fill"></div>
+    </div>
+
+    <!-- Station 1 -->
+    <div class="station" id="station-s1">
+      <div class="stamp-icon" id="icon-s1">
+        <svg viewBox="0 0 80 80" width="64" height="64">
+          <polygon id="hex-s1"
+            points="40,6 52,14 66,14 74,26 74,40 74,54 66,66 52,66 40,74 28,66 14,66 6,54 6,40 6,26 14,14 28,14"
+            fill="transparent" stroke="#a8c080" stroke-width="2.5"
+            style="transition: fill 0.4s, stroke 0.4s"/>
+          <text id="hextext-s1" x="40" y="48" text-anchor="middle" font-size="24" fill="#a8c080" font-family="Fraunces, serif" font-weight="700">1</text>
+        </svg>
+      </div>
+      <div class="station-body">
+        <div class="station-label" id="label-s1">Station 1</div>
+        <div class="input-row" id="input-row-s1">
+          <input type="number" id="input-s1" placeholder="Messwert [dB] eingeben…" />
+          <button class="btn-stamp" onclick="handleSubmit('s1')">Stempeln</button>
+        </div>
+        <div class="error-msg" id="error-s1"></div>
+      </div>
+    </div>
+
+    <!-- Station 2 -->
+    <div class="station" id="station-s2">
+      <div class="stamp-icon" id="icon-s2">
+        <svg viewBox="0 0 80 80" width="64" height="64">
+          <polygon id="hex-s2"
+            points="40,6 52,14 66,14 74,26 74,40 74,54 66,66 52,66 40,74 28,66 14,66 6,54 6,40 6,26 14,14 28,14"
+            fill="transparent" stroke="#a8c080" stroke-width="2.5"
+            style="transition: fill 0.4s, stroke 0.4s"/>
+          <text id="hextext-s2" x="40" y="48" text-anchor="middle" font-size="24" fill="#a8c080" font-family="Fraunces, serif" font-weight="700">2</text>
+        </svg>
+      </div>
+      <div class="station-body">
+        <div class="station-label" id="label-s2">Station 2</div>
+        <div class="input-row" id="input-row-s2">
+          <input type="number" id="input-s2" placeholder="Messwert [dB] eingeben…" />
+          <button class="btn-stamp" onclick="handleSubmit('s2')">Stempeln</button>
+        </div>
+        <div class="error-msg" id="error-s2"></div>
+      </div>
+    </div>
+
+    <!-- Station 3 -->
+    <div class="station" id="station-s3">
+      <div class="stamp-icon" id="icon-s3">
+        <svg viewBox="0 0 80 80" width="64" height="64">
+          <polygon id="hex-s3"
+            points="40,6 52,14 66,14 74,26 74,40 74,54 66,66 52,66 40,74 28,66 14,66 6,54 6,40 6,26 14,14 28,14"
+            fill="transparent" stroke="#a8c080" stroke-width="2.5"
+            style="transition: fill 0.4s, stroke 0.4s"/>
+          <text id="hextext-s3" x="40" y="48" text-anchor="middle" font-size="24" fill="#a8c080" font-family="Fraunces, serif" font-weight="700">3</text>
+        </svg>
+      </div>
+      <div class="station-body">
+        <div class="station-label" id="label-s3">Station 3</div>
+        <div class="input-row" id="input-row-s3">
+          <input type="number" id="input-s3" placeholder="Messwert [dB] eingeben…" />
+          <button class="btn-stamp" onclick="handleSubmit('s3')">Stempeln</button>
+        </div>
+        <div class="error-msg" id="error-s3"></div>
+      </div>
+    </div>
+
+    <!-- Completion -->
+    <div id="completion">
+      <div class="emoji">🎉</div>
+      <div class="done-title">Alle Stempel gesammelt!</div>
+      <div class="done-codes" id="done-codes"></div>
+      <div class="done-id" id="done-id"></div>
+    </div>
+  </div>
+
+  <button id="btn-reset" onclick="handleReset()">↺ Zurücksetzen</button>
+
+  <script>
+    // ─── CONFIG ───────────────────────────────────────────────────────────────
+    const SHEETS_URL = 'https://script.google.com/macros/s/AKfycbzwON6baGSfUMD0Aj0ZgZ_wxzENzeHcYGducGTPgBmdijRUpFZ_JS0PMIXXGHb2g6zafA/exec';
+    const MIN_VAL = 30;
+    const MAX_VAL = 100;
+    // ─────────────────────────────────────────────────────────────────────────
+
+    const STATIONS = ['s1', 's2', 's3'];
+    let state = { values: {s1:'',s2:'',s3:''}, submitted: {s1:false,s2:false,s3:false} };
+
+    function getOrCreateAnonId() {
+      const KEY = 'stempelpass-anon-id';
+      let id = null;
+      try { id = localStorage.getItem(KEY); } catch(e) {}
+      if (!id) {
+        id = 'SP-' +
+          Math.random().toString(36).slice(2, 10) + '-' +
+          Math.random().toString(36).slice(2, 6);
+        try { localStorage.setItem(KEY, id); } catch(e) {}
+      }
+      return id;
+    }
+    const ANON_ID = getOrCreateAnonId();
+    const SESSION_ID = 'sess-' + Math.random().toString(36).slice(2, 10);
+
+    try {
+      const saved = localStorage.getItem('stempelpass-data');
+      if (saved) state = JSON.parse(saved);
+    } catch(e) {}
+
+    function save() {
+      try { localStorage.setItem('stempelpass-data', JSON.stringify(state)); } catch(e) {}
+    }
+
+    function logToSheets(station, value) {
+      const params = new URLSearchParams({
+        timestamp: new Date().toISOString(),
+        anonId:    ANON_ID,
+        sessionId: SESSION_ID,
+        station:   station,
+        value:     value,
+        userAgent: navigator.userAgent
+      });
+      fetch(SHEETS_URL, {
+        method: 'POST',
+        mode: 'no-cors',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: params.toString()
+      }).catch(() => {});
+    }
+
+    function handleSubmit(id) {
+      const input = document.getElementById('input-' + id);
+      const val = input.value.trim();
+      const num = Number(val);
+      const errEl = document.getElementById('error-' + id);
+
+      if (val === '' || isNaN(num)) {
+        errEl.textContent = 'Bitte eine gültige Zahl eingeben.';
+        return;
+      }
+      if (num < MIN_VAL || num > MAX_VAL) {
+        errEl.textContent = `Wert muss zwischen ${MIN_VAL} und ${MAX_VAL} dB liegen.`;
+        return;
+      }
+
+      errEl.textContent = '';
+      state.values[id] = val;
+      state.submitted[id] = true;
+      save();
+      logToSheets(id, val);
+      renderStation(id);
+      updateProgress();
+      checkDone();
+    }
+
+    function handleReset() {
+      state = { values: {s1:'',s2:'',s3:''}, submitted: {s1:false,s2:false,s3:false} };
+      save();
+      STATIONS.forEach(id => renderStation(id));
+      updateProgress();
+      document.body.classList.remove('done');
+      document.getElementById('completion').style.display = 'none';
+    }
+
+    function renderStation(id) {
+      const done = state.submitted[id];
+      const stationEl = document.getElementById('station-' + id);
+      const hex = document.getElementById('hex-' + id);
+      const hextext = document.getElementById('hextext-' + id);
+      const inputRow = document.getElementById('input-row-' + id);
+      const label = document.getElementById('label-' + id);
+      const icon = document.getElementById('icon-' + id);
+
+      if (done) {
+        stationEl.classList.add('stamped');
+        hex.setAttribute('fill', 'var(--green)');
+        hex.setAttribute('stroke', 'var(--green-mid)');
+        hex.setAttribute('fill', '#5a8f1a');
+        hex.setAttribute('stroke', '#3a6b0e');
+        hextext.setAttribute('fill', 'white');
+        hextext.textContent = '✓';
+        icon.style.filter = 'drop-shadow(0 0 8px rgba(58,107,14,0.5))';
+        icon.classList.remove('stamp-anim');
+        void icon.offsetWidth;
+        icon.classList.add('stamp-anim');
+        setTimeout(() => icon.classList.remove('stamp-anim'), 700);
+        inputRow.style.display = 'none';
+        let hint = label.querySelector('.station-code-hint');
+        if (!hint) {
+          hint = document.createElement('span');
+          hint.className = 'station-code-hint';
+          label.appendChild(hint);
+        }
+        hint.textContent = '· Code: ' + state.values[id];
+      } else {
+        stationEl.classList.remove('stamped');
+        hex.setAttribute('fill', 'transparent');
+        hex.setAttribute('stroke', '#a8c080');
+        hextext.setAttribute('fill', '#a8c080');
+        hextext.textContent = id.slice(1); // "1", "2", "3"
+        icon.style.filter = 'none';
+        inputRow.style.display = 'flex';
+        document.getElementById('input-' + id).value = state.values[id] || '';
+        const hint = label.querySelector('.station-code-hint');
+        if (hint) hint.remove();
+      }
+    }
+
+    function updateProgress() {
+      const n = STATIONS.filter(id => state.submitted[id]).length;
+      document.getElementById('count').textContent = n;
+      document.getElementById('count2').textContent = n;
+      document.getElementById('progress-fill').style.width = (n / 3 * 100) + '%';
+    }
+
+    function checkDone() {
+      const allDone = STATIONS.every(id => state.submitted[id]);
+      if (allDone) {
+        document.body.classList.add('done');
+        const comp = document.getElementById('completion');
+        comp.style.display = 'block';
+        document.getElementById('done-codes').textContent =
+          'Codes: ' + state.values.s1 + ' · ' + state.values.s2 + ' · ' + state.values.s3;
+        document.getElementById('done-id').textContent = 'ID: ' + ANON_ID;
+      }
+    }
+
+    // Enter-Taste: jeweils eigene Station stempeln
+    STATIONS.forEach(id => {
+      const input = document.getElementById('input-' + id);
+      input.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') {
+          e.preventDefault();
+          handleSubmit(id);
+        }
+      });
     });
 
-    return ContentService
-      .createTextOutput(JSON.stringify({ rows: rows }))
-      .setMimeType(ContentService.MimeType.JSON);
-  } catch (err) {
-    return ContentService
-      .createTextOutput(JSON.stringify({ rows: [], error: String(err) }))
-      .setMimeType(ContentService.MimeType.JSON);
-  }
-}
+    STATIONS.forEach(id => renderStation(id));
+    updateProgress();
+    checkDone();
+  </script>
+</body>
+</html>
